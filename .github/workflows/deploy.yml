@@ -8,18 +8,18 @@ on:
 
 env:
     OIDC_ROLE_ARN: ${{ vars.OIDC_ROLE_ARN }}
-    APP_REPO:  ${{ vars.APP_REPO }}
     AWS_REGION:  ${{ vars.AWS_REGION }}
     TAG: latest
+
+permissions:
+  id-token: write
+  contents: read 
 
 jobs:
 
 # Create the infrastructure on AWS with the ressources in the ecr directory
   Create-the-infrastructure-in-AWS:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read 
       
     steps:
       - name: Checkout Code
@@ -61,153 +61,6 @@ jobs:
           name: infra-terraform-state-file
           path: infra/terraform.tfstate
           
-
-# Build and Push the backend and app images to the ECR repository previously created using the docker-build-script.sh and docker-push-script.sh generated
-  Build-and-Push-backend-and-app-images-to-ECR:
-    runs-on: ubuntu-latest
-    needs: Create-the-infrastructure-in-AWS
-    # Required for GitHub OIDC
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-            version: 2                         
-            verbose: false                     
-            arch: amd64
-
-      - name: Configure AWS credentials using OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          audience: sts.amazonaws.com 
-          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login_ecr
-        uses: aws-actions/amazon-ecr-login@v2     
-
-      - name: Build backend and app Docker images
-        run: |
-          # Build The app Image from the Dockerfile of the app
-          echo "Building app Docker image from the Dockerfile of the app"
-          docker build -t $app_REPO:$TAG app
-
-      - name: Push backend and app Docker images
-        run: |
-          # Push The app Image to the app ECR repository
-            echo "Pushing app Docker image to the app ECR repository"
-            docker push $app_REPO:$TAG    
-      
-
-  # Applying the terraform code to Launch the app and the backend app
-  Apply-the-terraform-code-to-Launch-the-app-and-the-backend-app:
-    runs-on: ubuntu-latest
-    needs: Build-and-Push-backend-and-app-images-to-ECR
-    permissions:
-      id-token: write
-      contents: read
-      
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0
-          
-      - name: Install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-            version: 2                         
-            verbose: false                     
-            arch: amd64    
-
-      - name: Configure AWS credentials using OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Use the ecs-apply-plan.tfplan artifact
-        run: |
-          cd ecs-deployment
-          terraform init -input=false
-          terraform apply -auto-approve  
-
-      - name: Print the Terraform State file ecs terraform.tfstate
-        run: |
-            cd ecs-deployment
-            terraform refresh
-            cat terraform.tfstate    
-      
-      - name: Upload the Terraform State file ecs.tfstate
-        uses: actions/upload-artifact@v4
-        with:
-          name: ecs-terraform-state-file
-          path: ecs-deployment/terraform.tfstate        
-
-# The wait-for-approval Job - manual approval implement with the environment approval feature
-  wait-for-ecs-destroy-approval:
-    runs-on: ubuntu-latest
-    needs: Apply-the-terraform-code-to-Launch-the-app-and-the-backend-app
-    environment:
-      name: destroy-approval # Environment requiring manual approval
-    steps:
-      - name: Wait for Approval
-        run: echo "Waiting for manual approval to destroy resources"
-
-
-# The destroy Job - Download the Artifact. Here is the terraform.tfstate file generated in the apply step 
-  destroy-ecs:
-    runs-on: ubuntu-latest
-    needs: wait-for-ecs-destroy-approval
-    permissions:
-      id-token: write
-      contents: read
-      
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0
-          
-      - name: Install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-            version: 2                         
-            verbose: false                     
-            arch: amd64
-
-      - name: Configure AWS credentials using OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-            
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ecs-terraform-state-file
-
-      - name: Use the terraform-state artifact
-        run: |
-          ls
-          mv terraform.tfstate ecs-deployment
-          cd ecs-deployment
-          terraform init -input=false
-          terraform refresh
-          terraform destroy -auto-approve
 
 # The wait-for-approval Job - manual approval implement with the environment approval feature
   wait-for-ecr-approval:
