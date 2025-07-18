@@ -73,8 +73,56 @@ resource "aws_ecr_repository" "repository-app" {
   force_delete = true
 }
 
+# ~~~~~~~~~~~~ Creating ECS Task Definition for the app services~~~~~~~~~
+
+resource "aws_ecs_task_definition" "app_task_definition" {
+    family = var.app_name
+    network_mode = "awsvpc"
+    execution_role_arn = module.ecs_execution_role.iam_role_arn
+    requires_compatibilities = ["FARGATE"]
+    cpu = var.cpu
+    memory = var.memory
+    container_definitions = jsonencode([
+    {
+      name      = "nginx"
+      image     = "nginx:latest"
+      essential = true
+      portMappings = [
+        {
+          containerPort = 80
+          hostPort      = 80
+        }
+      ]
+    }
+  ])
+    runtime_platform {
+      operating_system_family = "LINUX"
+      cpu_architecture = "X86_64"
+    }
+}
+
+resource "aws_ecs_service" "app_svc" {
+    name = var.app_name
+    cluster = aws_ecs_cluster.cluster.id
+    launch_type = "FARGATE"
+    task_definition = aws_ecs_task_definition.app_task_definition.arn
+    desired_count = 4
+
+    network_configuration {
+      security_groups = [aws_security_group.app_sg.id]
+      subnets = module.vpc.public_subnets
+      assign_public_ip = true
+    }
+
+    load_balancer {
+      target_group_arn = aws_lb_target_group.app_target_group.id
+      container_name = var.app_name
+      container_port = var.app_port
+    }
+  
+}
 
 
 output "INFO" {
-  value = "AWS Resources  has been provisioned. Repo link: ${aws_ecr_repository.repository-app.repository_url}"
+  value ="AWS Resources  has been provisioned. Repo link: ${aws_ecr_repository.repository-app.repository_url}" 
 }

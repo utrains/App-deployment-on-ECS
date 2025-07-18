@@ -100,7 +100,7 @@ resource "aws_ecs_task_definition" "app_task_definition" {
             "environment": [
                 {
                     "name": "REACT_APP_API_URL",
-                    "value": "http://${data.aws_alb.backend_lb.dns_name}:${var.app_port}/"
+                    "value": "http://${data.aws_alb.app_lb.dns_name}:${var.app_port}/"
                 }
             ]
         }
@@ -110,27 +110,6 @@ resource "aws_ecs_task_definition" "app_task_definition" {
       operating_system_family = "LINUX"
       cpu_architecture = "X86_64"
     }
-}
-
-resource "aws_ecs_service" "app_svc" {
-    name = var.app_name
-    cluster = data.aws_ecs_cluster.cluster.id
-    launch_type = "FARGATE"
-    task_definition = aws_ecs_task_definition.app_task_definition.arn
-    desired_count = 4
-
-    network_configuration {
-      security_groups = [data.aws_security_group.app_sg.id ]
-      subnets = [data.aws_subnet.public1.id, data.aws_subnet.public2.id]
-      assign_public_ip = true
-    }
-
-    load_balancer {
-      target_group_arn = data.aws_alb_target_group.app_tg.id
-      container_name = var.app_name
-      container_port = var.app_port
-    }
-  
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~ Output the URLs of the services ~~~~~~~~~~~~~~~~~~~~
