@@ -97,13 +97,13 @@ jobs:
         run: |
           # Build The app Image from the Dockerfile of the app
           echo "Building app Docker image from the Dockerfile of the app"
-          docker build -t $app_REPO:$TAG app
+          docker build -t $APP_REPO:$TAG app
 
       - name: Push backend and app Docker images
         run: |
           # Push The app Image to the app ECR repository
             echo "Pushing app Docker image to the app ECR repository"
-            docker push $app_REPO:$TAG    
+            docker push $APP_REPO:$TAG    
       
 
   # Applying the terraform code to Launch the app and the backend app
