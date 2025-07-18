@@ -5,11 +5,11 @@ on:
 #    branches:
 #      - main
   workflow_dispatch:
+  
 
 env:
-    OIDC_ROLE_ARN: ${{ vars.OIDC_ROLE_ARN }}
+    OIDC_ROLE_ARN: ${{ secrets.OIDC_ROLE_INFRA_ARN }}
     AWS_REGION:  ${{ vars.AWS_REGION }}
-    TAG: latest
 
 permissions:
   id-token: write
