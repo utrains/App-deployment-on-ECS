@@ -60,5 +60,5 @@ variable "cluster_name" {
 variable "app_port" {
     description = "port of the app"
     type = number
-    default = 5001
+    default = 80
 }

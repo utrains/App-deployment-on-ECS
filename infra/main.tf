@@ -84,13 +84,13 @@ resource "aws_ecs_task_definition" "app_task_definition" {
     memory = var.memory
     container_definitions = jsonencode([
     {
-      name      = "nginx"
-      image     = "nginx:latest"
+      name      = "Apache"
+      image     = "httpd:latest"
       essential = true
       portMappings = [
         {
-          containerPort = 80
-          hostPort      = 80
+          containerPort = var.app_port
+          hostPort      = var.app_port
         }
       ]
     }
