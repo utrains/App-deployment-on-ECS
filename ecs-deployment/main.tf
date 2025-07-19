@@ -56,13 +56,13 @@ data "aws_alb" "app_lb" {
     name = "${var.app_name}-lb" 
 }
 
-# ~~~~~~~~~~~~~~~~ Getting target Groups~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~ Getting target Groups ~~~~~~~~~~~~~~
 
 data "aws_alb_target_group" "app_tg" {
     name = "${var.app_name}-targets-group"
 }
 
-# ~~~~~~~~~~~~~~~~ Getting ecr repository~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~ Getting ecr repository ~~~~~~~~~~~~~~
 
 data "aws_ecr_repository" "front_repo" {
     name = "${var.app_name}-repo"
@@ -72,6 +72,17 @@ data "aws_iam_role" "execution_role" {
   name = "${var.project_name}-ecs-execution-role"
 }
 
+# ~~~~~~~~~~~~~~~~ Getting ecs service ~~~~~~~~~~~~~~
+
+resource "null_resource" "import_ecs_service" {
+  provisioner "local-exec" {
+    command = "terraform import aws_ecs_service.app_svc ${var.cluster_name}/${var.app_name}"
+  }
+
+  triggers = {
+    always_run = "${timestamp()}"
+  }
+}
 
 
 # ~~~~~~~~~~~~ Creating ECS Task Definition for the app services~~~~~~~~~
@@ -110,6 +121,27 @@ resource "aws_ecs_task_definition" "app_task_definition" {
       operating_system_family = "LINUX"
       cpu_architecture = "X86_64"
     }
+}
+
+resource "aws_ecs_service" "app_svc" {
+    name = var.app_name
+    cluster = data.aws_ecs_cluster.cluster.id
+    launch_type = "FARGATE"
+    task_definition = aws_ecs_task_definition.app_task_definition.arn
+    desired_count = 4
+
+    network_configuration {
+      security_groups = [data.aws_security_group.app_sg.id ]
+      subnets = [data.aws_subnet.public1.id, data.aws_subnet.public2.id]
+      assign_public_ip = true
+    }
+
+    load_balancer {
+      target_group_arn = data.aws_alb_target_group.app_tg.id
+      container_name = var.app_name
+      container_port = var.app_port
+    }
+  
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~ Output the URLs of the services ~~~~~~~~~~~~~~~~~~~~

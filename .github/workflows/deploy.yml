@@ -14,54 +14,6 @@ env:
 
 jobs:
 
-# Create the infrastructure on AWS with the ressources in the ecr directory
-  Create-the-infrastructure-in-AWS:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read 
-      
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0                     
-          
-      - name: Install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-            version: 2                         
-            verbose: false                     
-            arch: amd64
-            
-      - name: Configure AWS credentials using OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          
-      - name: terraform init & plan
-        run: |
-            cd infra
-            terraform init 
-            terraform apply -auto-approve 
-            
-      - name: Print the Terraform State file infra terraform.tfstate
-        run: |
-            cd infra
-            terraform refresh
-            cat terraform.tfstate
-     
-      - name: Upload the Terraform State file of the infrastructure
-        uses: actions/upload-artifact@v4
-        with:
-          name: infra-terraform-state-file
-          path: infra/terraform.tfstate
-          
-
 # Build and Push the backend and app images to the ECR repository previously created using the docker-build-script.sh and docker-push-script.sh generated
   Build-and-Push-backend-and-app-images-to-ECR:
     runs-on: ubuntu-latest
@@ -205,59 +157,6 @@ jobs:
           ls
           mv terraform.tfstate ecs-deployment
           cd ecs-deployment
-          terraform init -input=false
-          terraform refresh
-          terraform destroy -auto-approve
-
-# The wait-for-approval Job - manual approval implement with the environment approval feature
-  wait-for-ecr-approval:
-    runs-on: ubuntu-latest
-    needs: Create-the-infrastructure-in-AWS
-    environment:
-      name: destroy-approval # Environment requiring manual approval
-    steps:
-      - name: Wait for Approval
-        run: echo "Waiting for manual approval to destroy resources"
-
-  destroy-ecr:
-    runs-on: ubuntu-latest
-    needs: wait-for-ecr-approval
-    permissions:
-      id-token: write
-      contents: read
-      
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0
-          
-      - name: Install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-            version: 2                         
-            verbose: false                     
-            arch: amd64
-
-      - name: Configure AWS credentials using OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-            
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: infra-terraform-state-file
-
-      - name: Use the terraform-state artifact
-        run: |
-          ls
-          mv terraform.tfstate infra
-          cd infra
           terraform init -input=false
           terraform refresh
           terraform destroy -auto-approve
