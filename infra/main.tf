@@ -84,7 +84,7 @@ resource "aws_ecs_task_definition" "app_task_definition" {
     memory = var.memory
     container_definitions = jsonencode([
     {
-      name      = "Apache"
+      name      = var.app_name
       image     = "httpd:latest"
       essential = true
       portMappings = [
